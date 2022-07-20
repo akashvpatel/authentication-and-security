@@ -1,11 +1,14 @@
 //jshint esversion:6
-require("dotenv").config() 
+require("dotenv").config()
 const express = require("express")
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-var md5 = require('md5');
+const bcrypt = require("bcrypt")
+const saltRounds = 10;
+
 const app = express();
+
 
 app.use(express.static("public"));
 app.set("view engine", "ejs");
@@ -19,9 +22,9 @@ const userSchema = new mongoose.Schema({
 });
 const secret = "Thisourlittlesecret."
 
-  
+
 const user = new mongoose.model("user", userSchema)
-console.log(md5('password'));
+
 
 app.get("/", function (req, res) {
     res.render("home")
@@ -36,17 +39,22 @@ app.get("/register", function (req, res) {
 })
 
 app.post("/register", function (req, res) {
-    const newUser = new user({
-        email: req.body.username,
-        password: md5(req.body.password)    
+    bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+        // Store hash in your password DB.
+        const newUser = new user({
+            email: req.body.username,
+            password: hash
+        });
+        newUser.save(function (err) {
+            if (err) {
+                console.log(err)
+            } else {
+                res.render("secrets");
+            }
+        })
+
     })
-    newUser.save(function (err) {
-        if (err) {
-            console.log(err)
-        } else {
-            res.render("secrets");
-        }
-    })
+ 
 })
 
 app.post("/login", function (req, res) {
@@ -59,9 +67,14 @@ app.post("/login", function (req, res) {
 
         } else {
             if (foundUser) {
-                if (foundUser.password === password) {
-                    res.render("secrets")
-                }
+                bcrypt.compare(password, hash,foundUser.password,  function(err, result) {
+                    // result == true
+                    if(result === true){
+                        res.render("secrets")
+                    }
+                }); 
+                
+                
             }
         }
     })
